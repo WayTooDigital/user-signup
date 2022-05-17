@@ -50,3 +50,13 @@ This endpoint will return a JWT.
 Temporary register a wallet address and associate it with a new nonce (numeric random code).<br>
 Receives one `body` parameter:
 - walletAddress
+
+## Middleware
+
+The `authMiddleware` will validate if the requests contains the JWT in the `Authorization` key of the header. If the validation pass, the user ID will be stored in the variable `res.locals.user_id`, in order to be accesed by your application whenever you need to.
+In your project, you will need to add this lines:
+   ```js
+   import { authMiddleware } from "user-signup";
+   ...
+   app.use(authMiddleware);
+   ```

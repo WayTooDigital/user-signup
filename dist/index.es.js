@@ -1143,6 +1143,47 @@ router$1.post("/", body(["message", "signedMessage"]).not().isEmpty(), /*#__PURE
   };
 }());
 
+var authMiddleware = /*#__PURE__*/function () {
+  var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee(req, res, next) {
+    var authToken, resp;
+    return regenerator.wrap(function _callee$(_context) {
+      while (1) {
+        switch (_context.prev = _context.next) {
+          case 0:
+            authToken = req.headers["authorization"];
+            _context.prev = 1;
+            _context.next = 4;
+            return jwt.verify(authToken, global.config.jwt_secret);
+
+          case 4:
+            resp = _context.sent;
+            res.locals.user_id = resp.id;
+            _context.next = 11;
+            break;
+
+          case 8:
+            _context.prev = 8;
+            _context.t0 = _context["catch"](1);
+            return _context.abrupt("return", res.status(403).send({
+              message: "Failed to validate Auth token"
+            }));
+
+          case 11:
+            return _context.abrupt("return", next());
+
+          case 12:
+          case "end":
+            return _context.stop();
+        }
+      }
+    }, _callee, null, [[1, 8]]);
+  }));
+
+  return function authMiddleware(_x, _x2, _x3) {
+    return _ref.apply(this, arguments);
+  };
+}();
+
 var _global$config, _global$config2, _global$config3, _global$config4, _global$config5;
 var connectionString = (_global$config = global.config) === null || _global$config === void 0 ? void 0 : _global$config.db_protocol;
 
@@ -1190,5 +1231,5 @@ var router = express.Router();
 router.use('/nonces', router$2);
 router.use('/users', router$1);
 
-export { router };
+export { authMiddleware, router };
 //# sourceMappingURL=index.es.js.map
