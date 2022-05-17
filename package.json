@@ -1,6 +1,6 @@
 {
   "name": "user-signup",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "This package should be used on Express (NodeJS) projects that requires wallet authentication",
   "author": "Emilio Arcioni (WayTooDigital)",
   "license": "MIT",
@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.17.10",
+    "@babel/plugin-transform-runtime": "^7.17.12",
     "@babel/preset-env": "^7.17.10",
     "cross-env": "^7.0.3",
     "dotenv": "^16.0.1",

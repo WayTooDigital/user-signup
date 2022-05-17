@@ -27,6 +27,15 @@ export default {
     babel({
       exclude: "node_modules/**",
       presets: ["@babel/preset-env"],
+      plugins: [
+        [
+          "@babel/plugin-transform-runtime",
+          {
+            regenerator: true,
+          },
+        ],
+      ],
+      runtimeHelpers: true,
     }),
     commonjs(),
     json(),
