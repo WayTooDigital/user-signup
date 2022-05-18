@@ -49,5 +49,8 @@ export default {
     "tweetnacl-util",
     "bs58",
     "jsonwebtoken",
+    "@nfteyez/sol-rayz",
+    "@solana/web3.js",
+    "axios"
   ],
 };

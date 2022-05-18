@@ -4,6 +4,7 @@ var Schema = mongoose.Schema;
 var userSchema = new Schema(
   {
     walletAddress: { type: String, required: "{PATH} is required!" },
+    nfts: [{ type: Object }],
   },
   {
     timestamps: true,

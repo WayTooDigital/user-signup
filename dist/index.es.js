@@ -5,6 +5,9 @@ import nacl from 'tweetnacl';
 import naclUtil from 'tweetnacl-util';
 import bs58 from 'bs58';
 import jwt from 'jsonwebtoken';
+import { getParsedNftAccountsByOwner } from '@nfteyez/sol-rayz';
+import { PublicKey, Connection } from '@solana/web3.js';
+import axios from 'axios';
 
 function unwrapExports (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
@@ -964,13 +967,26 @@ router$2.post("/", body(["walletAddress"]).not().isEmpty(), /*#__PURE__*/functio
   };
 }());
 
+var readOnlyError = createCommonjsModule(function (module) {
+function _readOnlyError(name) {
+  throw new TypeError("\"" + name + "\" is read-only");
+}
+
+module.exports = _readOnlyError, module.exports.__esModule = true, module.exports["default"] = module.exports;
+});
+
+var _readOnlyError = unwrapExports(readOnlyError);
+
 var _excluded = ["_id", "createdAt", "updatedAt"];
 var Schema = mongoose.Schema;
 var userSchema = new Schema({
   walletAddress: {
     type: String,
     required: "{PATH} is required!"
-  }
+  },
+  nfts: [{
+    type: Object
+  }]
 }, {
   timestamps: true,
   versionKey: false,
@@ -986,6 +1002,92 @@ var userSchema = new Schema({
   }
 });
 var UserModel = mongoose.model("User", userSchema, "users");
+
+var fetchAndSaveWalletNfts = function fetchAndSaveWalletNfts(user) {
+  // Not using "await" on purpose to avoid keep the user waiting for response
+  return new Promise(function (resolve, reject) {
+    try {
+      getParsedNftAccountsByOwner({
+        publicAddress: new PublicKey(user.walletAddress),
+        connection: new Connection(global.config.solana_network, "confirmed")
+      }).then(function (allNfts) {
+        Promise.all(allNfts.filter(function (nft) {
+          return nft.data.creators.find(function (creator) {
+            return creator.address === global.config.nft_creator_address;
+          });
+        }).map( /*#__PURE__*/function () {
+          var _ref = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee(nft) {
+            var lastChar, resp;
+            return regenerator.wrap(function _callee$(_context) {
+              while (1) {
+                switch (_context.prev = _context.next) {
+                  case 0:
+                    _context.prev = 0;
+                    // The lastChar check is to avoid an unnecessary redirect from Arweave which requires the trailing "/"
+                    lastChar = nft.data.uri.charAt(nft.data.uri.length - 1);
+                    _context.next = 4;
+                    return axios.get("".concat(nft.data.uri).concat(lastChar !== "/" ? "/" : null));
+
+                  case 4:
+                    resp = _context.sent;
+                    nft.image = resp.data.image;
+                    _context.next = 12;
+                    break;
+
+                  case 8:
+                    _context.prev = 8;
+                    _context.t0 = _context["catch"](0);
+                    reject();
+                    console.log(_context.t0);
+
+                  case 12:
+                    return _context.abrupt("return", nft);
+
+                  case 13:
+                  case "end":
+                    return _context.stop();
+                }
+              }
+            }, _callee, null, [[0, 8]]);
+          }));
+
+          return function (_x) {
+            return _ref.apply(this, arguments);
+          };
+        }())).then( /*#__PURE__*/function () {
+          var _ref2 = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee2(response) {
+            return regenerator.wrap(function _callee2$(_context2) {
+              while (1) {
+                switch (_context2.prev = _context2.next) {
+                  case 0:
+                    _context2.next = 2;
+                    return UserModel.findOneAndUpdate({
+                      _id: user._id
+                    }, {
+                      nfts: response
+                    });
+
+                  case 2:
+                    resolve();
+
+                  case 3:
+                  case "end":
+                    return _context2.stop();
+                }
+              }
+            }, _callee2);
+          }));
+
+          return function (_x2) {
+            return _ref2.apply(this, arguments);
+          };
+        }());
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
 
 var router$1 = express.Router();
 
@@ -1119,27 +1221,108 @@ router$1.post("/", body(["message", "signedMessage"]).not().isEmpty(), /*#__PURE
 
           case 33:
             _user = _context.sent;
+            fetchAndSaveWalletNfts(_user);
             return _context.abrupt("return", res.status(201).send({
               token: generateToken(_user)
             }));
 
-          case 37:
-            _context.prev = 37;
+          case 38:
+            _context.prev = 38;
             _context.t1 = _context["catch"](30);
+            console.log(_context.t1);
             return _context.abrupt("return", res.status(400).send({
               message: "There was an error saving data"
             }));
 
-          case 40:
+          case 42:
           case "end":
             return _context.stop();
         }
       }
-    }, _callee, null, [[14, 18], [30, 37]]);
+    }, _callee, null, [[14, 18], [30, 38]]);
   }));
 
   return function (_x, _x2) {
     return _ref.apply(this, arguments);
+  };
+}()); // Get User by Wallet Address
+
+router$1.get("/:walletAddress", /*#__PURE__*/function () {
+  var _ref2 = _asyncToGenerator( /*#__PURE__*/regenerator.mark(function _callee2(req, res, next) {
+    var user, minutesSinceLastUpdate;
+    return regenerator.wrap(function _callee2$(_context2) {
+      while (1) {
+        switch (_context2.prev = _context2.next) {
+          case 0:
+            _context2.prev = 0;
+            _context2.next = 3;
+            return UserModel.findOne({
+              walletAddress: req.params.walletAddress
+            });
+
+          case 3:
+            user = _context2.sent;
+
+            if (user) {
+              _context2.next = 6;
+              break;
+            }
+
+            return _context2.abrupt("return", res.status(404).send());
+
+          case 6:
+            minutesSinceLastUpdate = Math.floor(Math.abs(new Date() - new Date(user.updatedAt)) / 1000 / 60); // Cache-like approach:
+            // Update the NFTs array if last update was more than 10 minutes ago
+
+            if (!(minutesSinceLastUpdate >= (global.config.fetch_nfts_cache || 0))) {
+              _context2.next = 11;
+              break;
+            }
+
+            fetchAndSaveWalletNfts(user);
+            _context2.next = 17;
+            break;
+
+          case 11:
+            if (!req.query.nocache) {
+              _context2.next = 17;
+              break;
+            }
+
+            _context2.next = 14;
+            return fetchAndSaveWalletNfts(user);
+
+          case 14:
+            _context2.next = 16;
+            return UserModel.findOne({
+              _id: user._id
+            });
+
+          case 16:
+            _readOnlyError("user");
+
+          case 17:
+            res.locals.user = user;
+            return _context2.abrupt("return", next());
+
+          case 21:
+            _context2.prev = 21;
+            _context2.t0 = _context2["catch"](0);
+            console.log(_context2.t0);
+            return _context2.abrupt("return", res.status(400).send({
+              message: "There was an error fetching data"
+            }));
+
+          case 25:
+          case "end":
+            return _context2.stop();
+        }
+      }
+    }, _callee2, null, [[0, 21]]);
+  }));
+
+  return function (_x3, _x4, _x5) {
+    return _ref2.apply(this, arguments);
   };
 }());
 
@@ -1151,32 +1334,38 @@ var authMiddleware = /*#__PURE__*/function () {
         switch (_context.prev = _context.next) {
           case 0:
             authToken = req.headers["authorization"];
-            _context.prev = 1;
-            _context.next = 4;
+
+            if (!authToken) {
+              _context.next = 12;
+              break;
+            }
+
+            _context.prev = 2;
+            _context.next = 5;
             return jwt.verify(authToken, global.config.jwt_secret);
 
-          case 4:
+          case 5:
             resp = _context.sent;
             res.locals.user_id = resp.id;
-            _context.next = 11;
+            _context.next = 12;
             break;
 
-          case 8:
-            _context.prev = 8;
-            _context.t0 = _context["catch"](1);
+          case 9:
+            _context.prev = 9;
+            _context.t0 = _context["catch"](2);
             return _context.abrupt("return", res.status(403).send({
               message: "Failed to validate Auth token"
             }));
 
-          case 11:
+          case 12:
             return _context.abrupt("return", next());
 
-          case 12:
+          case 13:
           case "end":
             return _context.stop();
         }
       }
-    }, _callee, null, [[1, 8]]);
+    }, _callee, null, [[2, 9]]);
   }));
 
   return function authMiddleware(_x, _x2, _x3) {

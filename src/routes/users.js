@@ -6,6 +6,7 @@ import bs58 from "bs58";
 import jwt from "jsonwebtoken";
 import UserModel from "../models/users.js";
 import NonceModel from "../models/nonces.js";
+import fetchAndSaveWalletNfts from "../services/fetchAndSaveWalletNfts";
 
 const router = express.Router();
 
@@ -73,16 +74,50 @@ router.post(
         walletAddress: walletAddress,
       }).save();
 
-      // TODO
-      // await fetchAndSaveWalletNfts(user);
+      fetchAndSaveWalletNfts(user);
 
       return res.status(201).send({ token: generateToken(user) });
     } catch (err) {
+      console.log(err);
       return res
         .status(400)
         .send({ message: "There was an error saving data" });
     }
   }
 );
+
+// Get User by Wallet Address
+router.get("/:walletAddress", async (req, res, next) => {
+  try {
+    const user = await UserModel.findOne({
+      walletAddress: req.params.walletAddress,
+    });
+
+    if (!user) return res.status(404).send();
+
+    const minutesSinceLastUpdate = Math.floor(
+      Math.abs(new Date() - new Date(user.updatedAt)) / 1000 / 60
+    );
+
+    // Cache-like approach:
+    // Update the NFTs array if last update was more than 10 minutes ago
+    if (minutesSinceLastUpdate >= (global.config.fetch_nfts_cache || 0)) {
+      fetchAndSaveWalletNfts(user);
+    } else if (req.query.nocache) {
+      await fetchAndSaveWalletNfts(user);
+      user = await UserModel.findOne({
+        _id: user._id,
+      });
+    }
+
+    res.locals.user = user;
+    return next();
+  } catch (e) {
+    console.log(e);
+    return res
+      .status(400)
+      .send({ message: "There was an error fetching data" });
+  }
+});
 
 export { router };
